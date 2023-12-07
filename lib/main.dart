@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'package:intl/intl.dart';
 
 import 'util/handle_input.dart';
 
@@ -34,7 +35,8 @@ class MyApp extends StatelessWidget {
 class TimeTrackerScreen extends StatefulWidget {
   final FirebaseFirestore firestore;
 
-  const TimeTrackerScreen({Key? key, required this.firestore}) : super(key: key);
+  const TimeTrackerScreen({Key? key, required this.firestore})
+      : super(key: key);
 
   @override
   _TimeTrackerScreenState createState() => _TimeTrackerScreenState();
@@ -100,46 +102,195 @@ class _TimeTrackerScreenState extends State<TimeTrackerScreen> {
                   SizedBox(
                     height: 16.0,
                   ),
+                  ElevatedButton(
+                    onPressed: () {
+                      showTimeUsageReportDialog();
+                    },
+                    child: Text('Time Usage Report'),
+                  ),
+                  SizedBox(
+                    height: 16.0,
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      findMostTimeSpentActivities();
+                    },
+                    child: Text('Most Time Spent'),
+                  ),
+                  SizedBox(
+                    height: 16.0,
+                  ),
                   Column(
                     children: matchingDocuments,
                   ),
                 ]),
               )
-              // SizedBox(height: 16.0,),
-              // StreamBuilder<QuerySnapshot>(
-              //   stream: timeEntries.snapshots(),
-              //   builder: (context, snapshot) {
-              //     if (snapshot.hasError) {
-              //       return Text('Error: ${snapshot.error}');
-              //     }
-
-              //     if (snapshot.connectionState == ConnectionState.waiting) {
-              //       return CircularProgressIndicator();
-              //     }
-
-              //     if (snapshot.data == null) {
-              //       return Text('No data available');
-              //     }
-
-              //     // Display the list of time entries
-              //     return Column(
-              //       children:
-              //           snapshot.data!.docs.map((DocumentSnapshot document) {
-              //         Map<String, dynamic> data =
-              //             document.data() as Map<String, dynamic>;
-              //         return ListTile(
-              //           title: Text(
-              //               'Date: ${data['date']}, Task: ${data['task']}, Tag: ${data['tag']}'),
-              //         );
-              //       }).toList(),
-              //     );
-              //   },
-              // ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  void showTimeUsageReportDialog() {
+    String start = "";
+    String finish = "";
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return AlertDialog(
+              title: Text('Search'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(height: 16.0),
+                  TextField(
+                    controller: TextEditingController()..text = start,
+                    onChanged: (value) {
+                      start = value;
+                    },
+                    decoration: InputDecoration(
+                        labelText: 'Enter Start Date (YYYY/MM/DD)'),
+                  ),
+                  SizedBox(height: 16.0),
+                  TextField(
+                    controller: TextEditingController()..text = finish,
+                    onChanged: (value) {
+                      finish = value;
+                    },
+                    decoration: InputDecoration(
+                        labelText: 'Enter Finish Date (YYYY/MM/DD)'),
+                  ),
+                ],
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    generateTimeUsageReport(start, finish);
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('Submit'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void generateTimeUsageReport(String startDate, String endDate) {
+    widget.firestore
+        .collection('time_entries')
+        .where('date', isGreaterThanOrEqualTo: startDate)
+        .where('date', isLessThanOrEqualTo: endDate)
+        .get()
+        .then((QuerySnapshot querySnapshot) {
+      setState(() {
+        matchingDocuments.clear(); // Clear the previous results
+
+        if (querySnapshot.docs.isEmpty) {
+          // No matching documents found, show a Snackbar
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'No matching documents found for the specified date range'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          // Matching documents found, create ListTile widgets
+          querySnapshot.docs.forEach((DocumentSnapshot document) {
+            Map<String, dynamic> data = document.data() as Map<String, dynamic>;
+
+            // Create a ListTile widget for each matching document
+            matchingDocuments.add(
+              ListTile(
+                title: Text(
+                    'Date: ${data['date']}, ${data['from']} - ${data['to']}, Task: ${data['task']}, Tag: ${data['tag']}'),
+              ),
+            );
+          });
+        }
+      });
+    });
+  }
+
+  void findMostTimeSpentActivities() {
+    widget.firestore
+        .collection('time_entries')
+        .get()
+        .then((QuerySnapshot querySnapshot) {
+      setState(() {
+        matchingDocuments.clear(); // Clear the previous results
+
+        if (querySnapshot.docs.isEmpty) {
+          // No matching documents found, show a Snackbar
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('No time entries found'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          // Group time entries by task and calculate total time spent on each task
+          Map<String, int> totalTimeByTask = {};
+
+          querySnapshot.docs.forEach((DocumentSnapshot document) {
+            Map<String, dynamic> data = document.data() as Map<String, dynamic>;
+            print(data);
+            String tag = data['tag'];
+            int duration = calculateDuration(data['from'], data['to']);
+            totalTimeByTask[tag] = (totalTimeByTask[tag] ?? 0) + duration;
+          });
+
+          // Sort tasks by total time spent in descending order
+          List<MapEntry<String, int>> sortedTasks = totalTimeByTask.entries
+              .toList()
+            ..sort((a, b) => b.value.compareTo(a.value));
+
+          // Create ListTile widgets for the tasks with the highest total time spent
+          sortedTasks.forEach((entry) {
+            matchingDocuments.add(
+              ListTile(
+                title: Text(
+                    'Task: ${entry.key}, Total Time Spent: ${entry.value} minutes'),
+              ),
+            );
+          });
+        }
+      });
+    });
+  }
+
+  int calculateDuration(String from, String to) {
+    print('from: ${from}');
+    print('to: ${to}');
+
+    // Trim leading and trailing whitespaces
+    from = from.replaceAll(RegExp(r'\s+'), '');
+    to = to.replaceAll(RegExp(r'\s+'), '');
+
+    try {
+      DateTime fromFormat = DateFormat("hh:mma").parse(from);
+      DateTime toFormat = DateFormat("hh:mma").parse(to);
+
+      int duration = toFormat.difference(fromFormat).inMinutes;
+
+      return duration;
+    } catch (e) {
+      print('Error calculating duration: $e');
+      return 0; // or handle the error accordingly
+    }
   }
 
   void showTagSearchDialog() {
@@ -265,7 +416,10 @@ class _TimeTrackerScreenState extends State<TimeTrackerScreen> {
 
   void fetchAllDocuments() {
     // Fetch and display all documents
-    widget.firestore.collection('time_entries').get().then((QuerySnapshot querySnapshot) {
+    widget.firestore
+        .collection('time_entries')
+        .get()
+        .then((QuerySnapshot querySnapshot) {
       setState(() {
         matchingDocuments.clear(); // Clear the previous results
         querySnapshot.docs.forEach((DocumentSnapshot document) {
