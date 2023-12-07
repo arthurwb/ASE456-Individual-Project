@@ -1,30 +1,118 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:project/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('Screen Loads Test', (WidgetTester tester) async {
+    final fakeFirestore = FakeFirebaseFirestore();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MyApp(firestore: fakeFirestore),
+      ),
+    );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Time Tracker'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'Save Entry'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'Search'), findsOneWidget);
   });
+
+  testWidgets('Save Entry Test', (WidgetTester tester) async {
+    final fakeFirestore = FakeFirebaseFirestore();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MyApp(firestore: fakeFirestore),
+      ),
+    );
+
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Date (YYYY/MM/DD)'), '2023/12/12');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'From (H:mm AM/PM)'), '6:00 PM');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'To (H:mm AM/PM)'), '9:00 AM');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Task'), 'running a test');
+    await tester.enterText(find.widgetWithText(TextField, 'Tag'), 'TEST');
+    await tapButton(tester, 'Save Entry');
+
+    final querySnapshot = await fakeFirestore.collection('time_entries').get();
+    expect(querySnapshot.docs.length, 1);
+  });
+
+  testWidgets('Search Query Test', (WidgetTester tester) async {
+    final fakeFirestore = FakeFirebaseFirestore();
+
+    await fakeFirestore.collection('time_entries').add({
+      'date': '2023/12/12',
+      'from': '6:00 PM',
+      'to': '9:00 AM',
+      'task': 'running a test',
+      'tag': 'TEST',
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MyApp(firestore: fakeFirestore),
+      ),
+    );
+
+    await tapButton(tester, 'Search');
+
+    expect(find.text('Search'), findsAtLeast(2));
+
+    await tester.enterText(find.widgetWithText(TextField, 'Enter tag'), 'TEST');
+    await tapButton(tester, 'Submit');
+
+    expect(
+        find.text(
+            'Date: 2023/12/12, 6:00 PM - 9:00 AM, Task: running a test, Tag: TEST'),
+        findsOneWidget);
+  });
+
+  testWidgets('Load All Data Test', (WidgetTester tester) async {
+    final fakeFirestore = FakeFirebaseFirestore();
+
+    await fakeFirestore.collection('time_entries').add({
+      'date': '2023/12/12',
+      'from': '6:00 PM',
+      'to': '9:00 AM',
+      'task': 'running a test',
+      'tag': 'TEST',
+    });
+
+    await fakeFirestore.collection('time_entries').add({
+      'date': '2023/12/13',
+      'from': '10:00 AM',
+      'to': '1:00 PM',
+      'task': 'another test',
+      'tag': 'ANOTHER',
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MyApp(firestore: fakeFirestore),
+      ),
+    );
+
+    await tapButton(tester, "Search");
+
+    await tapButton(tester, 'Display All');
+
+    expect(
+        find.text(
+            'Date: 2023/12/12, 6:00 PM - 9:00 AM, Task: running a test, Tag: TEST'),
+        findsOneWidget);
+    expect(
+        find.text(
+            'Date: 2023/12/13, 10:00 AM - 1:00 PM, Task: another test, Tag: ANOTHER'),
+        findsOneWidget);
+  });
+}
+
+Future<void> tapButton(WidgetTester tester, String label) async {
+  await tester.tap(find.text(label));
+  await tester.pumpAndSettle();
 }
