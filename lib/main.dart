@@ -263,7 +263,7 @@ class _TimeTrackerScreenState extends State<TimeTrackerScreen> {
             matchingDocuments.add(
               ListTile(
                 title: Text(
-                    'Task: ${entry.key}, Total Time Spent: ${entry.value} minutes'),
+                    'Tag: ${entry.key}, Total Time Spent: ${entry.value} minutes'),
               ),
             );
           });

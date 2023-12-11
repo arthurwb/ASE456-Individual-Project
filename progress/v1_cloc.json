@@ -1,0 +1,33 @@
+{"header" : {
+    "cloc_url"           : "github.com/AlDanial/cloc",
+    "cloc_version"       : "1.98",
+    "elapsed_seconds"    : 0.24762487411499,
+    "n_files"            : 4,
+    "n_lines"            : 545,
+    "files_per_second"   : 16.1534660615012,
+    "lines_per_second"   : 2200.90975087954},
+  "lib\\main.dart" :{
+    "blank": 30,
+    "comment": 38,
+    "code": 247,
+    "language": "Dart"},
+  "test\\widget_test.dart" :{
+    "blank": 22,
+    "comment": 0,
+    "code": 96,
+    "language": "Dart"},
+  "lib\\firebase_options.dart" :{
+    "blank": 5,
+    "comment": 12,
+    "code": 63,
+    "language": "Dart"},
+  "lib\\util\\handle_input.dart" :{
+    "blank": 4,
+    "comment": 0,
+    "code": 28,
+    "language": "Dart"},
+  "SUM": {
+    "blank": 61,
+    "comment": 50,
+    "code": 434,
+    "nFiles": 4} }
